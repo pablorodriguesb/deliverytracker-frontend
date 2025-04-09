@@ -1,27 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import WebSocketListener from '../components/WebSocketListener';
 
 function DeliveryTracker() {
-  const [message, setMessage] = useState('');
+  const [posicao, setPosicao] = useState(null);
 
-  useEffect(() => {
-    const socket = new WebSocket('ws://localhost:8080/ws/delivery');
-
-    socket.onmessage = (event) => {
-      const data = event.data;
-      setMessage(data);
-    };
-
-    socket.onerror = (error) => {
-      console.error('Erro no WebSocket:', error);
-    };
-
-    return () => socket.close();
-  }, []);
+  const handleNovaPosicao = (novaPosicao) => {
+    console.log('Nova posição recebida:', novaPosicao);
+    setPosicao(novaPosicao);
+  };
 
   return (
     <div>
+      <WebSocketListener onMessage={handleNovaPosicao} />
+
       <h2>📦 Rastreamento em tempo real</h2>
-      <p>Status da entrega: {message}</p>
+
+      {posicao ? (
+        <div>
+          <p><strong>Entregador:</strong> {posicao.entregador}</p>
+          <p><strong>Status:</strong> {posicao.status}</p>
+          <p><strong>Latitude:</strong> {posicao.latitude}</p>
+          <p><strong>Longitude:</strong> {posicao.longitude}</p>
+        </div>
+      ) : (
+        <p>Aguardando dados do entregador...</p>
+      )}
     </div>
   );
 }

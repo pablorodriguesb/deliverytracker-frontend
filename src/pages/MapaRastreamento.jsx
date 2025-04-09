@@ -3,6 +3,8 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet'
 import axios from 'axios';
 import L from 'leaflet';
 
+import WebSocketListener from "../components/WebSocketListener";
+
 import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -22,34 +24,26 @@ function MapaRastreamento() {
   const [entregadorSelecionado, setEntregadorSelecionado] = useState('');
   const [statusFiltro, setStatusFiltro] = useState('');
 
-  // Simulação de entregadores
-  const entregadoresUnicos = [...new Map(rotas.map(r => [r.entregador?.id, r.entregador])).values()];
-
+  // Requisição inicial das rotas
   useEffect(() => {
-    // Requisição inicial para obter rotas
     axios.get('http://localhost:8080/api/rotas')
       .then(response => {
         setRotas(response.data);
-        setPosicaoAtual(response.data[0]); // começa pelo primeiro ponto
+        setPosicaoAtual(response.data[0]);
       })
       .catch(error => console.error('Erro ao buscar rotas:', error));
   }, []);
 
-  useEffect(() => {
-    // Simula movimentação em tempo real (a cada 5 segundos)
-    if (rotas.length > 1) {
-      let index = 0;
+  // Recebe atualização em tempo real do WebSocket
+  const handleNovaPosicao = (novaPosicao) => {
+    setPosicaoAtual(novaPosicao);
+    setRotas(prev => [...prev, novaPosicao]); // adiciona à lista de rotas
+  };
 
-      const intervalo = setInterval(() => {
-        index = (index + 1) % rotas.length;
-        setPosicaoAtual(rotas[index]);
-      }, 5000);
+  // Simulação de entregadores únicos
+  const entregadoresUnicos = [...new Map(rotas.map(r => [r.entregador?.id, r.entregador])).values()];
 
-      return () => clearInterval(intervalo);
-    }
-  }, [rotas]);
-
-  // Filtro aplicado por entregador e status
+  // Filtro por entregador e status
   const rotasFiltradas = rotas.filter(r =>
     (!entregadorSelecionado || r.entregador?.id === entregadorSelecionado) &&
     (!statusFiltro || r.entregador?.status === statusFiltro)
@@ -57,6 +51,9 @@ function MapaRastreamento() {
 
   return (
     <div style={{ display: 'flex' }}>
+      {/* WebSocket ativo */}
+      <WebSocketListener onMessage={handleNovaPosicao} />
+
       {/* Painel de controle */}
       <div style={{ width: '300px', padding: '20px', borderRight: '1px solid #ccc' }}>
         <h2>Gestão de Entregadores</h2>
@@ -68,11 +65,14 @@ function MapaRastreamento() {
           style={{ width: '100%', marginBottom: '10px' }}
         >
           <option value="">Todos</option>
-          {entregadoresUnicos.map(ent => (
-            <option key={ent.id} value={ent.id}>
-              {ent.nome || `ID ${ent.id}`}
-            </option>
-          ))}
+          {entregadoresUnicos
+            .filter(ent => ent?.id !== undefined)
+            .map(ent => (
+              <option key={ent.id} value={ent.id}>
+                {ent.nome || `ID ${ent.id}`}
+              </option>
+            ))}
+
         </select>
 
         <label>Filtrar por Status:</label>
@@ -106,8 +106,8 @@ function MapaRastreamento() {
             />
           )}
 
-          {/* Posição atual do entregador */}
-          {posicaoAtual && (
+          {/* Posição atual */}
+          {posicaoAtual?.latitude && posicaoAtual?.longitude && (
             <Marker position={[posicaoAtual.latitude, posicaoAtual.longitude]}>
               <Popup>
                 Entregador ID: {posicaoAtual.entregador?.id}<br />
